@@ -72,6 +72,29 @@ wrongNumbers =
   , "353011133330000"
   , "3566002028360505" ]
 
+correctCvc :: [Text]
+correctCvc =
+  [ "311"
+  , "3211"
+  , "9999"
+  , "0000"
+  , "000"
+  , "1234"
+  , "111"
+  ]
+
+wrongCvc :: [Text]
+wrongCvc =
+  [ "31111"
+  , "a31"
+  , "zzz"
+  , "00O"
+  , "000O"
+  , "OOO"
+  , "11111"
+  , "11"
+  ]
+
 checkNumbers :: [Text] -> CreditCardType -> Spec
 checkNumbers ns t = describe (show t) $ do
   for_ ns $ \n -> it (T.unpack n) $ do
@@ -94,3 +117,7 @@ spec = describe "Credit card number validation" $ do
     (parseExpirationDate . formatExpiryDate) d == Just d
   prop "JSON instances isomorphism" $ \(cc :: CreditCard) ->
     (decode . encode) cc == Just cc
+  it "Wrong CVC" $ for_ wrongCvc $ \cvc -> do
+    parseCreditCardSecurity cvc `shouldBe` Nothing
+  it "Correct CVC" $ for_ correctCvc $ \cvc -> do
+    parseCreditCardSecurity cvc `shouldBe` Just (CreditCardSecurity cvc)

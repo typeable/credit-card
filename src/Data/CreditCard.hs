@@ -54,7 +54,6 @@ import Control.Lens hiding (elements)
 import Control.Monad (guard)
 import Data.Aeson as Aeson
 import Data.Aeson.Inflections (defaultFieldLabelModifier)
-import Data.Aeson.Types (withText)
 import Data.Char (isDigit)
 import Data.Digit
 import Data.Either (isRight)
@@ -245,7 +244,7 @@ parseCreditCardSecurity txt
   | otherwise = Nothing
   where
     isValid = and
-      [ T.length txt == 3
+      [ (3, 4) `inRange` T.length txt
       , T.all isDigit txt ]
 
 data CreditCard = CreditCard
