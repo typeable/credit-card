@@ -5,6 +5,16 @@ synopsis: Credit card validation
 license-file:        LICENSE
 build-type:          Simple
 
+Flag store
+  Description: Enable Data.Store serialization support
+  Default:     False
+  Manual:      False
+
+Flag postgres
+  Description: Enable Postgresql support
+  Default:     True
+  Manual:      False
+
 library
   hs-source-dirs:      src
   ghc-options:         -Wall
@@ -19,8 +29,13 @@ library
                      , openapi3
                      , text
                      , time
-  if !impl(ghcjs)
+  if !impl(ghcjs) && flag(postgres)
     build-depends:     postgresql-simple
+  if flag(store)
+    build-depends:
+      store
+    cpp-options: -DUSE_STORE
+    default-extensions: DeriveAnyClass
   default-language:    Haskell2010
   default-extensions:  GeneralizedNewtypeDeriving
                      , DeriveGeneric
