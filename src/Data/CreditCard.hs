@@ -72,19 +72,29 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time
 #ifndef ghcjs_HOST_OS
+#ifdef USE_POSTGRES
 import Database.PostgreSQL.Simple.FromField
 import Database.PostgreSQL.Simple.ToField
+#endif
 #endif
 import Formatting as F
 import GHC.Generics (Generic)
 import Numeric.Natural
 import Test.QuickCheck.Arbitrary
 import Test.QuickCheck.Gen
+#ifdef USE_STORE
+import qualified Data.Store
+import qualified Data.Store.Internal
+#endif
 
 
 newtype ZipCode = ZipCode
   { unZipCode :: Text }
-  deriving (Show, Eq, Generic, ToJSON, FromJSON, ToSchema)
+  deriving stock (Show, Eq, Generic)
+  deriving newtype (ToJSON, FromJSON, ToSchema)
+#ifdef USE_STORE
+  deriving anyclass Data.Store.Store
+#endif
 
 makePrisms ''ZipCode
 
@@ -94,6 +104,9 @@ data CreditCardDate = CreditCardDate
   , _ccdMonth :: Int
     -- ^ Month number in range [1..12]
   } deriving (Eq, Show, Generic)
+#ifdef USE_STORE
+  deriving anyclass Data.Store.Store
+#endif
 
 instance ToSchema CreditCardDate where
   declareNamedSchema _ = declareNamedSchema (Proxy @Text)
@@ -153,6 +166,7 @@ newtype CreditCardNumber = CreditCardNumber
   { unCreditCardNumber :: NonEmpty Digit }
   deriving (Eq, Generic)
 
+
 instance ToSchema CreditCardNumber where
   declareNamedSchema _ = declareNamedSchema (Proxy @Text)
 
@@ -166,6 +180,15 @@ parseCardNumber = preview (_DigitsText . from _CreditCardNumber)
 
 apiCreditCardNumber :: Prism' Text CreditCardNumber
 apiCreditCardNumber = prism' renderCardNumber parseCardNumber
+
+#ifdef USE_STORE
+instance Data.Store.Store CreditCardNumber where
+  poke = Data.Store.poke . renderCardNumber
+  peek = do
+    maybeNumber <- parseCardNumber <$> Data.Store.peek
+    maybe (fail "invalid stored credit card number") pure maybeNumber
+  size = Data.Store.VarSize (Data.Store.Internal.getSize . renderCardNumber)
+#endif
 
 instance FromJSON CreditCardNumber where
   parseJSON = withText "CreditCardNumber" $ \s ->
@@ -208,8 +231,10 @@ panToBogusNumber (CreditCardPAN txt) =
     check = fromMaybe (error "Failed to parse PAN back to digits")
 
 #ifndef ghcjs_HOST_OS
+#ifdef USE_CASSAVA
 deriving instance FromField CreditCardPAN
 deriving instance ToField CreditCardPAN
+#endif
 #endif
 
 mkCreditCardPan :: CreditCardNumber -> CreditCardPAN
@@ -224,6 +249,9 @@ newtype CreditCardSecurity = CreditCardSecurity
   { unCCSecurity :: Text }
   deriving (Eq, Ord, Generic)
   deriving newtype (ToJSON, FromJSON, ToSchema)
+#ifdef USE_STORE
+  deriving anyclass Data.Store.Store
+#endif
 
 instance Arbitrary CreditCardSecurity where
   arbitrary = CreditCardSecurity . T.pack . concatMap (show :: Int -> String)
@@ -254,6 +282,9 @@ data CreditCard = CreditCard
   , _ccExpirationDate :: !(CreditCardDate)
   , _ccZipCode        :: !(Maybe ZipCode)
   } deriving (Eq, Generic, Show)
+#ifdef USE_STORE
+  deriving anyclass Data.Store.Store
+#endif
 
 instance ToSchema CreditCard where
   declareNamedSchema p = genericDeclareNamedSchema opts p
