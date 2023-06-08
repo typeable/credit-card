@@ -51,7 +51,7 @@ module Data.CreditCard
 
 import Control.Lens hiding (elements)
 
-import Control.Monad (guard)
+import Control.Monad (guard, (<=<))
 import Data.Aeson as Aeson
 import Data.Aeson.Inflections (defaultFieldLabelModifier)
 import Data.Char (isDigit)
@@ -221,14 +221,12 @@ panTrailingDigits (CreditCardPAN txt) = T.takeEnd 4 txt
 --   This may not seem terribly useful on its own,
 --   but this allows to reuse some functions working
 --   with CC numbers.
-panToBogusNumber :: CreditCardPAN -> CreditCardNumber
-panToBogusNumber (CreditCardPAN txt) =
-  CreditCardNumber $ sconcat $ NE.fromList [leading, middle, trailing]
-  where
-    leading = check $ preview _DigitsText $ T.take 4 txt
-    middle = NE.fromList $ replicate (T.length txt - 8) D0
-    trailing = check $ preview _DigitsText $ T.takeEnd 4 txt
-    check = fromMaybe (error "Failed to parse PAN back to digits")
+panToBogusNumber :: CreditCardPAN -> Maybe CreditCardNumber
+panToBogusNumber (CreditCardPAN txt) = do
+  leading <- preview _DigitsText $ T.take 4 txt
+  trailing <- preview _DigitsText $ T.takeEnd 4 txt
+  let middle = NE.fromList $ replicate (T.length txt - 8) D0
+  return $ CreditCardNumber $ sconcat $ NE.fromList [leading, middle, trailing]
 
 #ifndef ghcjs_HOST_OS
 #ifdef USE_CASSAVA
@@ -388,4 +386,4 @@ isValidCCNumber :: CreditCardNumber -> Bool
 isValidCCNumber = isRight . creditCardType
 
 guessPANCardType :: CreditCardPAN -> Maybe CreditCardType
-guessPANCardType = guessCreditCardType . panToBogusNumber
+guessPANCardType = guessCreditCardType <=< panToBogusNumber
