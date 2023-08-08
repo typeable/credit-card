@@ -229,7 +229,7 @@ panToBogusNumber (CreditCardPAN txt) = do
   return $ CreditCardNumber $ sconcat $ NE.fromList [leading, middle, trailing]
 
 #ifndef ghcjs_HOST_OS
-#ifdef USE_CASSAVA
+#ifdef USE_POSTGRES
 deriving instance FromField CreditCardPAN
 deriving instance ToField CreditCardPAN
 #endif
