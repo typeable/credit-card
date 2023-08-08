@@ -9,6 +9,8 @@ extra-deps:
   commit: e03f087c90c9228a9ae52a0e516eba22589eef94
 - git: https://github.com/typeable/missing-lens.git
   commit: 328659fdda8fd7ec509abfab6298775062fc2926
+nix:
+  packages: [postgresql_14]
 
 # Override default flag values for local packages and extra-deps
 # flags: {}
