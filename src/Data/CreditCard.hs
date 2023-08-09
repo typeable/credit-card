@@ -2,6 +2,7 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Data.CreditCard
@@ -75,6 +76,7 @@ import Data.Time
 #ifdef USE_POSTGRES
 import Database.PostgreSQL.Simple.FromField
 import Database.PostgreSQL.Simple.ToField
+import Database.PostgreSQL.Simple.Newtypes
 #endif
 #endif
 import Formatting as F
@@ -228,12 +230,6 @@ panToBogusNumber (CreditCardPAN txt) = do
   let middle = NE.fromList $ replicate (T.length txt - 8) D0
   return $ CreditCardNumber $ sconcat $ NE.fromList [leading, middle, trailing]
 
-#ifndef ghcjs_HOST_OS
-#ifdef USE_POSTGRES
-deriving instance FromField CreditCardPAN
-deriving instance ToField CreditCardPAN
-#endif
-#endif
 
 mkCreditCardPan :: CreditCardNumber -> CreditCardPAN
 mkCreditCardPan n = CreditCardPAN $ firstDigits <> stars <> lastDigits
@@ -317,9 +313,17 @@ data CreditCardType
   | DinersClub
   | JCB
   | UnionPay
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic)
 
 makePrisms ''CreditCardType
+
+instance FromJSON CreditCardType where
+  parseJSON =
+    genericParseJSON defaultOptions
+
+instance ToJSON CreditCardType where
+  toJSON =
+    genericToJSON defaultOptions
 
 data CreditCardError
   = UnknownCardNumber
@@ -390,3 +394,12 @@ isValidCCNumber = isRight . creditCardType
 
 guessPANCardType :: CreditCardPAN -> Maybe CreditCardType
 guessPANCardType = guessCreditCardType <=< panToBogusNumber
+
+#ifndef ghcjs_HOST_OS
+#ifdef USE_POSTGRES
+deriving instance FromField CreditCardPAN
+deriving instance ToField CreditCardPAN
+deriving via (Aeson CreditCardType) instance FromField CreditCardType
+deriving via (Aeson CreditCardType) instance ToField CreditCardType
+#endif
+#endif
