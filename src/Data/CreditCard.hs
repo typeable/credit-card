@@ -363,7 +363,7 @@ guessCreditCardType n
     isVisa         = (4 == firstDigits 1) && (digitsLength `elem` [13,16,19])
     isMasterCard   = (inRange (51, 55) (firstDigits 2)) && (digitsLength == 16)
     isAmEx         = (firstDigits 2 `elem` [34, 37]) && (digitsLength == 15)
-    isUnionPay     = (firstDigits 2 `elem` [60, 62]) && (digitsLength `elem` [16,17,18,19])
+    isUnionPay     = (firstDigits 2 `elem` [62]) && (digitsLength `elem` [16,17,18,19])
     isDiscoverCard =
       (firstDigits 4 == 6011 || inRange (644, 649) (firstDigits 3)
         || inRange (622126, 622925) (firstDigits 6) || firstDigits 2 == 65)
