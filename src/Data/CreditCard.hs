@@ -319,6 +319,9 @@ makePrisms ''CreditCardType
 instance Arbitrary CreditCardType where
   arbitrary = elements [minBound..maxBound]
 
+instance ToSchema CreditCardType where
+  declareNamedSchema p = genericDeclareNamedSchema defaultSchemaOptions p
+
 instance FromJSON CreditCardType where
   parseJSON =
     genericParseJSON defaultOptions
