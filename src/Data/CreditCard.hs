@@ -76,7 +76,6 @@ import Data.Time
 #ifdef USE_POSTGRES
 import Database.PostgreSQL.Simple.FromField
 import Database.PostgreSQL.Simple.ToField
-import Database.PostgreSQL.Simple.Newtypes
 #endif
 #endif
 import Formatting as F
@@ -399,7 +398,27 @@ guessPANCardType = guessCreditCardType <=< panToBogusNumber
 #ifdef USE_POSTGRES
 deriving instance FromField CreditCardPAN
 deriving instance ToField CreditCardPAN
-deriving via (Aeson CreditCardType) instance FromField CreditCardType
-deriving via (Aeson CreditCardType) instance ToField CreditCardType
+instance ToField CreditCardType where
+  toField cardType = toField $ case cardType of
+    Visa           -> "Visa"
+    MasterCard     -> "MasterCard"
+    AmericanExpress-> "AmericanExpress"
+    DiscoverCard   -> "DiscoverCard"
+    DinersClub     -> "DinersClub"
+    JCB            -> "JCB"
+    UnionPay       -> "UnionPay" :: Text
+
+instance FromField CreditCardType where
+  fromField f mbs = do
+    txt <- fromField f mbs
+    case T.unpack txt of
+        "Visa"           -> return Visa
+        "MasterCard"     -> return MasterCard
+        "AmericanExpress"-> return AmericanExpress
+        "DiscoverCard"   -> return DiscoverCard
+        "DinersClub"     -> return DinersClub
+        "JCB"            -> return JCB
+        "UnionPay"       -> return UnionPay
+        _ -> returnError ConversionFailed f ("Invalid credit card type: " ++ T.unpack txt)
 #endif
 #endif
