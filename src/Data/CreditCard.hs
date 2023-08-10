@@ -312,9 +312,12 @@ data CreditCardType
   | DinersClub
   | JCB
   | UnionPay
-  deriving (Eq, Show, Generic)
+  deriving (Eq, Show, Generic, Enum, Bounded)
 
 makePrisms ''CreditCardType
+
+instance Arbitrary CreditCardType where
+  arbitrary = elements [minBound..maxBound]
 
 instance FromJSON CreditCardType where
   parseJSON =
