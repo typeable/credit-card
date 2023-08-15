@@ -2,6 +2,7 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Data.CreditCard
@@ -32,6 +33,7 @@ module Data.CreditCard
   , _DiscoverCard
   , _DinersClub
   , _JCB
+  , _UnionPay
   , CreditCardError(..)
   , _UnknownCardNumber
   , _InvalidCardNumber
@@ -62,7 +64,6 @@ import Data.Ix
 import Data.List as L
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NE
-import Data.Maybe (fromMaybe)
 import Data.OpenApi as OpenApi
   ( ToSchema(..), SchemaOptions(..), defaultSchemaOptions
   , genericDeclareNamedSchema)
@@ -228,12 +229,6 @@ panToBogusNumber (CreditCardPAN txt) = do
   let middle = NE.fromList $ replicate (T.length txt - 8) D0
   return $ CreditCardNumber $ sconcat $ NE.fromList [leading, middle, trailing]
 
-#ifndef ghcjs_HOST_OS
-#ifdef USE_CASSAVA
-deriving instance FromField CreditCardPAN
-deriving instance ToField CreditCardPAN
-#endif
-#endif
 
 mkCreditCardPan :: CreditCardNumber -> CreditCardPAN
 mkCreditCardPan n = CreditCardPAN $ firstDigits <> stars <> lastDigits
@@ -316,9 +311,24 @@ data CreditCardType
   | DiscoverCard
   | DinersClub
   | JCB
-  deriving (Eq, Show)
+  | UnionPay
+  deriving (Eq, Show, Generic, Enum, Bounded)
 
 makePrisms ''CreditCardType
+
+instance Arbitrary CreditCardType where
+  arbitrary = elements [minBound..maxBound]
+
+instance ToSchema CreditCardType where
+  declareNamedSchema p = genericDeclareNamedSchema defaultSchemaOptions p
+
+instance FromJSON CreditCardType where
+  parseJSON =
+    genericParseJSON defaultOptions
+
+instance ToJSON CreditCardType where
+  toJSON =
+    genericToJSON defaultOptions
 
 data CreditCardError
   = UnknownCardNumber
@@ -353,11 +363,13 @@ guessCreditCardType n
   | isDinersClub   = Just DinersClub
   | isJCB          = Just JCB
   | isVisa         = Just Visa  --  NOTE: starts with just 4? realy?
+  | isUnionPay     = Just UnionPay
   | otherwise      = Nothing
   where
     isVisa         = (4 == firstDigits 1) && (digitsLength `elem` [13,16,19])
     isMasterCard   = (inRange (51, 55) (firstDigits 2)) && (digitsLength == 16)
     isAmEx         = (firstDigits 2 `elem` [34, 37]) && (digitsLength == 15)
+    isUnionPay     = (firstDigits 2 `elem` [62]) && (digitsLength `elem` [16,17,18,19])
     isDiscoverCard =
       (firstDigits 4 == 6011 || inRange (644, 649) (firstDigits 3)
         || inRange (622126, 622925) (firstDigits 6) || firstDigits 2 == 65)
@@ -387,3 +399,32 @@ isValidCCNumber = isRight . creditCardType
 
 guessPANCardType :: CreditCardPAN -> Maybe CreditCardType
 guessPANCardType = guessCreditCardType <=< panToBogusNumber
+
+#ifndef ghcjs_HOST_OS
+#ifdef USE_POSTGRES
+deriving instance FromField CreditCardPAN
+deriving instance ToField CreditCardPAN
+instance ToField CreditCardType where
+  toField cardType = toField $ case cardType of
+    Visa           -> "Visa"
+    MasterCard     -> "MasterCard"
+    AmericanExpress-> "AmericanExpress"
+    DiscoverCard   -> "DiscoverCard"
+    DinersClub     -> "DinersClub"
+    JCB            -> "JCB"
+    UnionPay       -> "UnionPay" :: Text
+
+instance FromField CreditCardType where
+  fromField f mbs = do
+    txt <- fromField f mbs
+    case T.unpack txt of
+        "Visa"           -> return Visa
+        "MasterCard"     -> return MasterCard
+        "AmericanExpress"-> return AmericanExpress
+        "DiscoverCard"   -> return DiscoverCard
+        "DinersClub"     -> return DinersClub
+        "JCB"            -> return JCB
+        "UnionPay"       -> return UnionPay
+        _ -> returnError ConversionFailed f ("Invalid credit card type: " ++ T.unpack txt)
+#endif
+#endif
