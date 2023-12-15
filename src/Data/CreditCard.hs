@@ -213,7 +213,7 @@ instance Arbitrary CreditCardNumber where
 newtype CreditCardPAN = CreditCardPAN
   { unCreditCardPAN :: Text
   } deriving (Eq, Ord)
-    deriving newtype (Show)
+    deriving newtype (Show, FromJSON, ToJSON)
 
 panTrailingDigits :: CreditCardPAN -> Text
 panTrailingDigits (CreditCardPAN txt) = T.takeEnd 4 txt
