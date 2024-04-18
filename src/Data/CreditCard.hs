@@ -56,6 +56,7 @@ import Control.Lens hiding (elements)
 import Control.Monad (guard, (<=<))
 import Data.Aeson as Aeson
 import Data.Aeson.Inflections (defaultFieldLabelModifier)
+import Data.Binary (Binary)
 import Data.Char (isDigit)
 import Data.Digit
 import Data.Either (isRight)
@@ -313,6 +314,8 @@ data CreditCardType
   | JCB
   | UnionPay
   deriving (Eq, Show, Generic, Enum, Bounded)
+
+instance Binary CreditCardType
 
 makePrisms ''CreditCardType
 
