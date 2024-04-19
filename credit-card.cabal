@@ -23,6 +23,7 @@ library
                      , QuickCheck
                      , aeson
                      , aeson-inflections >= 0.1
+                     , binary
                      , digit
                      , formatting
                      , lens
