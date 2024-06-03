@@ -370,7 +370,9 @@ guessCreditCardType n
   | otherwise      = Nothing
   where
     isVisa         = (4 == firstDigits 1) && (digitsLength `elem` [13,16,19])
-    isMasterCard   = (inRange (51, 55) (firstDigits 2)) && (digitsLength == 16)
+    isMasterCard   =
+      (inRange (51, 55) (firstDigits 2)) && (digitsLength == 16)
+      || (inRange (2221, 2720) (firstDigits 4)) && (digitsLength == 16)
     isAmEx         = (firstDigits 2 `elem` [34, 37]) && (digitsLength == 15)
     isUnionPay     = (firstDigits 2 `elem` [62]) && (digitsLength `elem` [16,17,18,19])
     isDiscoverCard =
