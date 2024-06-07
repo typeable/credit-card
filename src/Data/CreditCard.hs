@@ -370,24 +370,27 @@ guessCreditCardType n
   | otherwise      = Nothing
   where
     isVisa         = (4 == firstDigits 1) && (digitsLength `elem` [13,16,19])
-    isMasterCard   =
-      (inRange (51, 55) (firstDigits 2)) && (digitsLength == 16)
-      || (inRange (2221, 2720) (firstDigits 4)) && (digitsLength == 16)
+    isMasterCard   = or
+      [ inRange (51, 55) (firstDigits 2) && (digitsLength == 16)
+      , inRange (2221, 2720) (firstDigits 4) && (digitsLength == 16)]
     isAmEx         = (firstDigits 2 `elem` [34, 37]) && (digitsLength == 15)
     isUnionPay     = (firstDigits 2 `elem` [62]) && (digitsLength `elem` [16,17,18,19])
-    isDiscoverCard =
-      (firstDigits 4 == 6011 || inRange (644, 649) (firstDigits 3)
-        || inRange (622126, 622925) (firstDigits 6) || firstDigits 2 == 65)
+    isDiscoverCard = or
+      [ firstDigits 4 == 6011
+      , inRange (644, 649) (firstDigits 3)
+      , inRange (622126, 622925) (firstDigits 6)
+      , firstDigits 2 == 65]
       && (digitsLength `elem` [16, 19])
-    isDinersClub   =
-      ((inRange (300, 305) (firstDigits 3) || firstDigits 3 == 309
-        || firstDigits 2 == 36 || inRange (38, 39) (firstDigits 2))
-      && digitsLength == 14)
-      || (firstDigits 2 `elem` [54, 55] && digitsLength == 16)
-    isJCB          =
-      (inRange (3528, 3589) (firstDigits 4) && digitsLength `elem` [15, 16])
-      || (firstDigits 4 `elem` [1800, 2131] && digitsLength == 15)
-      || (firstDigits 6 == 357266 && digitsLength == 19)
+    isDinersClub = or
+      [ inRange (300, 305) (firstDigits 3) && digitsLength == 14
+      , firstDigits 3 == 309 && digitsLength == 14
+      , firstDigits 2 == 36 && digitsLength == 14
+      , inRange (38, 39) (firstDigits 2) && digitsLength == 14
+      , firstDigits 2 `elem` [54, 55] && digitsLength == 16]
+    isJCB = or
+      [ inRange (3528, 3589) (firstDigits 4) && digitsLength `elem` [15, 16]
+      , firstDigits 4 `elem` [1800, 2131] && digitsLength == 15
+      , firstDigits 6 == 357266 && digitsLength == 19]
     digitsLength   = L.length $ n ^. _CreditCardNumber
     firstDigits x  = poly10 @Integer $ L.take x
       $ n ^.. _CreditCardNumber . folded . to digitToNum
