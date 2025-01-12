@@ -30,7 +30,7 @@ library
                      , openapi3
                      , text
                      , time
-  if !impl(ghcjs) && flag(postgres)
+  if !(impl(ghcjs) || arch(javascript)) && flag(postgres)
     build-depends:     postgresql-simple
     cpp-options: -DUSE_POSTGRES
   if flag(store)
