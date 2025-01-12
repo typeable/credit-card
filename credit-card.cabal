@@ -25,14 +25,14 @@ library
                      , aeson-inflections >= 0.1
                      , binary
                      , digit
-                     , formatting
                      , lens
-                     , openapi3
                      , text
                      , time
   if !(impl(ghcjs) || arch(javascript)) && flag(postgres)
     build-depends:     postgresql-simple
     cpp-options: -DUSE_POSTGRES
+  if !(impl(ghcjs) || arch(javascript))
+    build-depends:     openapi3
   if flag(store)
     build-depends:
       store
@@ -44,6 +44,11 @@ library
                      , ScopedTypeVariables
                      , TypeApplications
                      , ViewPatterns
+  ghc-options:
+    -Wall
+  if impl(ghc >= 8.10)
+    ghc-options: -Wunused-packages
+    -Wunused-packages
 
 test-suite spec
   type:                exitcode-stdio-1.0
@@ -59,3 +64,8 @@ test-suite spec
   other-modules:       CreditCardSpec
   default-extensions:  ScopedTypeVariables
                      , OverloadedStrings
+  ghc-options:
+    -Wall
+  if impl(ghc >= 8.10)
+    ghc-options: -Wunused-packages
+    -Wunused-packages

@@ -1,9 +1,10 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use ||" #-}
 
 module Data.CreditCard
   ( -- * Types
@@ -53,7 +54,7 @@ module Data.CreditCard
 
 import Control.Lens hiding (elements)
 
-import Control.Monad (guard, (<=<))
+import Control.Monad (guard, (<=<), replicateM)
 import Data.Aeson as Aeson
 import Data.Aeson.Inflections (defaultFieldLabelModifier)
 import Data.Binary (Binary)
@@ -65,21 +66,20 @@ import Data.Ix
 import Data.List as L
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NE
-import Data.OpenApi as OpenApi
-  ( ToSchema(..), SchemaOptions(..), defaultSchemaOptions
-  , genericDeclareNamedSchema)
-import Data.Proxy
 import Data.Semigroup
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time
 #ifndef ghcjs_HOST_OS
+import Data.Proxy
+import Data.OpenApi as OpenApi
+  ( ToSchema(..), SchemaOptions(..), defaultSchemaOptions
+  , genericDeclareNamedSchema)
 #ifdef USE_POSTGRES
 import Database.PostgreSQL.Simple.FromField
 import Database.PostgreSQL.Simple.ToField
 #endif
 #endif
-import Formatting as F
 import GHC.Generics (Generic)
 import Numeric.Natural
 import Test.QuickCheck.Arbitrary
@@ -93,7 +93,11 @@ import qualified Data.Store.Internal
 newtype ZipCode = ZipCode
   { unZipCode :: Text }
   deriving stock (Show, Eq, Generic)
+#ifdef ghcjs_HOST_OS
+  deriving newtype (ToJSON, FromJSON)
+#else
   deriving newtype (ToJSON, FromJSON, ToSchema)
+#endif
 #ifdef USE_STORE
   deriving anyclass Data.Store.Store
 #endif
@@ -110,17 +114,12 @@ data CreditCardDate = CreditCardDate
   deriving anyclass Data.Store.Store
 #endif
 
-instance ToSchema CreditCardDate where
-  declareNamedSchema _ = declareNamedSchema (Proxy @Text)
-
 makeLenses ''CreditCardDate
 
 formatExpiryDate :: CreditCardDate -> Text
-formatExpiryDate ccd =
-  F.sformat
-    (F.left 2 '0' F.% F.left 2 '0')
-    (F.sformat F.int $ ccd ^. ccdMonth)
-    (F.sformat F.int $ ccd ^. ccdYear - 2000)
+formatExpiryDate ccd = s2 (ccd ^. ccdMonth) <> s2 (ccd ^. ccdYear - 2000)
+  where
+    s2 = T.justifyLeft 2 '0' . T.pack . show
 
 -- NOTE: This function is supposed to be called 'parseExpiryDate',
 -- but we already have a function with the same name in b2b/api
@@ -167,10 +166,6 @@ cardExpirationDay ccd = fromGregorian year month day
 newtype CreditCardNumber = CreditCardNumber
   { unCreditCardNumber :: NonEmpty Digit }
   deriving (Eq, Generic)
-
-
-instance ToSchema CreditCardNumber where
-  declareNamedSchema _ = declareNamedSchema (Proxy @Text)
 
 makePrisms ''CreditCardNumber
 
@@ -242,14 +237,18 @@ mkCreditCardPan n = CreditCardPAN $ firstDigits <> stars <> lastDigits
 newtype CreditCardSecurity = CreditCardSecurity
   { unCCSecurity :: Text }
   deriving (Eq, Ord, Generic)
+#ifdef ghcjs_HOST_OS
+  deriving newtype (ToJSON, FromJSON)
+#else
   deriving newtype (ToJSON, FromJSON, ToSchema)
+#endif
 #ifdef USE_STORE
   deriving anyclass Data.Store.Store
 #endif
 
 instance Arbitrary CreditCardSecurity where
   arbitrary = CreditCardSecurity . T.pack . concatMap (show :: Int -> String)
-    <$> sequence (replicate 3 (choose (0, 9)))
+    <$> replicateM 3 (choose (0, 9))
 
 -- | Show instance for 'CreditCardSecurity' doesn't actually show
 --   anything. It replaces all characters with '*'.
@@ -265,26 +264,18 @@ parseCreditCardSecurity txt
   | isValid = pure $ CreditCardSecurity txt
   | otherwise = Nothing
   where
-    isValid = and
-      [ (3, 4) `inRange` T.length txt
-      , T.all isDigit txt ]
+    isValid = (3, 4) `inRange` T.length txt && T.all isDigit txt
 
 data CreditCard = CreditCard
-  { _ccNumber         :: !(CreditCardNumber)
-  , _ccHolderName     :: !(Text)
+  { _ccNumber         :: !CreditCardNumber
+  , _ccHolderName     :: !Text
   , _ccSecurity       :: !(Maybe CreditCardSecurity)
-  , _ccExpirationDate :: !(CreditCardDate)
+  , _ccExpirationDate :: !CreditCardDate
   , _ccZipCode        :: !(Maybe ZipCode)
   } deriving (Eq, Generic, Show)
 #ifdef USE_STORE
   deriving anyclass Data.Store.Store
 #endif
-
-instance ToSchema CreditCard where
-  declareNamedSchema p = genericDeclareNamedSchema opts p
-    where
-      opts = defaultSchemaOptions
-        { OpenApi.fieldLabelModifier = defaultFieldLabelModifier }
 
 instance FromJSON CreditCard where
   parseJSON =
@@ -322,9 +313,6 @@ makePrisms ''CreditCardType
 instance Arbitrary CreditCardType where
   arbitrary = elements [minBound..maxBound]
 
-instance ToSchema CreditCardType where
-  declareNamedSchema p = genericDeclareNamedSchema defaultSchemaOptions p
-
 instance FromJSON CreditCardType where
   parseJSON =
     genericParseJSON defaultOptions
@@ -347,8 +335,8 @@ getDigits = F.toList . fmap digitToNum . unDigits . natToDigits
 getLuhnDigit :: [Digit] -> Digit
 getLuhnDigit n = digitFromNumMod10 (total * 9)
   where
-    total = sum $ L.map multEven $ L.zip [0..] $ L.reverse n
-    multEven (i :: Int, digitToNum -> a)
+    total = sum $ L.zipWith multEven [0..] $ L.reverse n
+    multEven (i :: Int) (digitToNum -> a)
       | even i    = sum $ getDigits (a * 2)
       | otherwise = a
 
@@ -374,7 +362,7 @@ guessCreditCardType n
       [ inRange (51, 55) (firstDigits 2) && (digitsLength == 16)
       , inRange (2221, 2720) (firstDigits 4) && (digitsLength == 16)]
     isAmEx         = (firstDigits 2 `elem` [34, 37]) && (digitsLength == 15)
-    isUnionPay     = (firstDigits 2 `elem` [62]) && (digitsLength `elem` [16,17,18,19])
+    isUnionPay     = (firstDigits 2 == 62) && (digitsLength `elem` [16,17,18,19])
     isDiscoverCard = or
       [ firstDigits 4 == 6011
       , inRange (644, 649) (firstDigits 3)
@@ -396,11 +384,11 @@ guessCreditCardType n
       $ n ^.. _CreditCardNumber . folded . to digitToNum
 
 creditCardType :: CreditCardNumber -> Either CreditCardError CreditCardType
-creditCardType n = case checkLuhnDigit n of
-  True -> case guessCreditCardType n of
+creditCardType n
+  | checkLuhnDigit n = case guessCreditCardType n of
     Nothing -> Left UnknownCardNumber
     Just t  -> Right t
-  False -> Left InvalidCardNumber
+  | otherwise = Left InvalidCardNumber
 
 isValidCCNumber :: CreditCardNumber -> Bool
 isValidCCNumber = isRight . creditCardType
@@ -435,4 +423,21 @@ instance FromField CreditCardType where
         "UnionPay"       -> return UnionPay
         _ -> returnError ConversionFailed f ("Invalid credit card type: " ++ T.unpack txt)
 #endif
+#endif
+
+#ifndef ghcjs_HOST_OS
+instance ToSchema CreditCardDate where
+  declareNamedSchema _ = declareNamedSchema (Proxy @Text)
+
+instance ToSchema CreditCardNumber where
+  declareNamedSchema _ = declareNamedSchema (Proxy @Text)
+
+instance ToSchema CreditCard where
+  declareNamedSchema = genericDeclareNamedSchema opts
+    where
+      opts = defaultSchemaOptions
+        { OpenApi.fieldLabelModifier = defaultFieldLabelModifier }
+
+instance ToSchema CreditCardType where
+  declareNamedSchema = genericDeclareNamedSchema defaultSchemaOptions
 #endif
