@@ -119,7 +119,7 @@ makeLenses ''CreditCardDate
 formatExpiryDate :: CreditCardDate -> Text
 formatExpiryDate ccd = s2 (ccd ^. ccdMonth) <> s2 (ccd ^. ccdYear - 2000)
   where
-    s2 = T.justifyLeft 2 '0' . T.pack . show
+    s2 = T.justifyRight 2 '0' . T.pack . show
 
 -- NOTE: This function is supposed to be called 'parseExpiryDate',
 -- but we already have a function with the same name in b2b/api
