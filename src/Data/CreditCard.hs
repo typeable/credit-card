@@ -70,7 +70,7 @@ import Data.Semigroup
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time
-#ifndef ghcjs_HOST_OS
+#ifdef BACKEND
 import Data.Proxy
 import Data.OpenApi as OpenApi
   ( ToSchema(..), SchemaOptions(..), defaultSchemaOptions
@@ -93,10 +93,10 @@ import qualified Data.Store.Internal
 newtype ZipCode = ZipCode
   { unZipCode :: Text }
   deriving stock (Show, Eq, Generic)
-#ifdef ghcjs_HOST_OS
-  deriving newtype (ToJSON, FromJSON)
-#else
+#ifdef BACKEND
   deriving newtype (ToJSON, FromJSON, ToSchema)
+#else
+  deriving newtype (ToJSON, FromJSON)
 #endif
 #ifdef USE_STORE
   deriving anyclass Data.Store.Store
@@ -237,10 +237,10 @@ mkCreditCardPan n = CreditCardPAN $ firstDigits <> stars <> lastDigits
 newtype CreditCardSecurity = CreditCardSecurity
   { unCCSecurity :: Text }
   deriving (Eq, Ord, Generic)
-#ifdef ghcjs_HOST_OS
-  deriving newtype (ToJSON, FromJSON)
-#else
+#ifdef BACKEND
   deriving newtype (ToJSON, FromJSON, ToSchema)
+#else
+  deriving newtype (ToJSON, FromJSON)
 #endif
 #ifdef USE_STORE
   deriving anyclass Data.Store.Store
@@ -396,7 +396,7 @@ isValidCCNumber = isRight . creditCardType
 guessPANCardType :: CreditCardPAN -> Maybe CreditCardType
 guessPANCardType = guessCreditCardType <=< panToBogusNumber
 
-#ifndef ghcjs_HOST_OS
+#ifdef BACKEND
 #ifdef USE_POSTGRES
 deriving instance FromField CreditCardPAN
 deriving instance ToField CreditCardPAN
@@ -425,7 +425,7 @@ instance FromField CreditCardType where
 #endif
 #endif
 
-#ifndef ghcjs_HOST_OS
+#ifdef BACKEND
 instance ToSchema CreditCardDate where
   declareNamedSchema _ = declareNamedSchema (Proxy @Text)
 

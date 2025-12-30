@@ -33,6 +33,7 @@ library
     cpp-options: -DUSE_POSTGRES
   if !(impl(ghcjs) || arch(javascript) || arch(wasm32))
     build-depends:     openapi3
+    cpp-options: -DBACKEND
   if flag(store)
     build-depends:
       store
